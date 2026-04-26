@@ -1,0 +1,30 @@
+body {
+    margin: 0;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.87);
+    background-color: #000000;
+}
+
+#app {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+@font-face {
+    font-family: 'DepartureMono';
+    src: url('/DepartureMono-1.500/DepartureMono-Regular.woff2') format('woff2'),
+         url('/DepartureMono-1.500/DepartureMono-Regular.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Optional: Force the browser to load it early */
+.font-loader {
+    font-family: 'DepartureMono';
+    position: absolute;
+    opacity: 0;
+}
