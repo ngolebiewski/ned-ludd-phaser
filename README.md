@@ -1,6 +1,15 @@
+# Ned Ludd Game
+## Machines: theme of the game jam
+I switched this game from Pixi to Phaser
+Was running out of time and spending most of it building the game engine part for Pixi, which I still like and want a lightweight just what I need engine. 
+Phaser has a lot built-in, looking forward to using that here.
+
+Notes:
 Love this font: https://departuremono.com/
 
+Ned Ludd, of the Luddites...
 
+![Ned Ludd spritesheet](public/assets/ned_smasher.png)
 
 
 # Phaser Vite Template

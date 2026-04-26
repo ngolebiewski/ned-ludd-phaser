@@ -60,7 +60,7 @@ export class Title extends Scene {
           targets: this.englandGroup,
           alpha: 1,
           duration: 800,
-          hold: 1000, // Keep it on screen for 1 second
+          hold: 500, // Keep it on screen for 1 second
           onComplete: () => {
             // Phase 3: Final Fade Out
             this.cameras.main.fadeOut(500, 0, 0, 0);
