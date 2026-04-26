@@ -34,7 +34,7 @@ export const playSFX = (type) => {
             break;
         case "hit":
             // Volume bumped to 4.0
-            console.log("play hit sound")
+            // console.log("play hit sound")
             zzfx(zzfxG(...[4.0,,274,.02,.06,.19,4,2.4,,-2,,,.01,1.1,,.2,,.83,.02,.11]));
             break;
         case "jump":
