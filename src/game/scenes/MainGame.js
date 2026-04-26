@@ -12,6 +12,7 @@ import {
 export class MainGame extends Scene {
   constructor() {
     super("MainGame");
+    this.isInvulnerable = false; // Persistent state for the cheat
   }
 
   create() {
@@ -25,7 +26,20 @@ export class MainGame extends Scene {
       this.sound.play("factory_song", { loop: true, volume: 0.3 });
     }
 
-    // 1. BACKGROUND WALL TILES (Pixel Art Variance & 90deg rotation)
+    // 1. CHEAT CODE LISTENERS
+    // Toggle Invulnerability with 'I'
+    this.input.keyboard.on("keydown-I", () => {
+      this.isInvulnerable = !this.isInvulnerable;
+      this.player.setAlpha(this.isInvulnerable ? 0.5 : 1);
+      console.log("Invulnerability:", this.isInvulnerable);
+    });
+
+    // Skip to Boss with '9'
+    this.input.keyboard.on("keydown-NINE", () => {
+      this.scene.start("BossBattle");
+    });
+
+    // 2. BACKGROUND WALL TILES (Pixel Art Variance & 90deg rotation)
     for (let x = 0; x < levelWidth; x += 64) {
       for (let y = 0; y < height; y += 64) {
         const v = PhaserMath.Between(-30, 30);
@@ -43,23 +57,23 @@ export class MainGame extends Scene {
       }
     }
 
-    // 2. WINDOWS
+    // 3. WINDOWS
     for (let x = 400; x < levelWidth; x += 7 * 64) {
       this.spawnGrimyWindow(x, 128);
     }
 
-    // 3. GROUPS
+    // 4. GROUPS
     this.platforms = this.physics.add.staticGroup();
     this.machineGroup = this.physics.add.staticGroup();
     this.enemyGroup = this.physics.add.group({ runChildUpdate: true });
 
-    // 4. TERRAIN & ENEMY GENERATION
+    // 5. TERRAIN & ENEMY GENERATION
     this.generateTerrain(levelWidth, height);
 
-    // 5. PLAYER & SYSTEMS
+    // 6. PLAYER & SYSTEMS
     this.setupPlayerAndSystems(levelWidth, height);
 
-    // 6. MACHINES
+    // 7. MACHINES
     [1500, 3000, 4500, 6000, 7500].forEach((x) => {
       this.spawnMachineSafely(
         x,
@@ -67,7 +81,7 @@ export class MainGame extends Scene {
       );
     });
 
-    // 7. PHYSICS COLLIDERS
+    // 8. PHYSICS COLLIDERS
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.enemyGroup, this.platforms);
 
@@ -77,7 +91,7 @@ export class MainGame extends Scene {
       (player, enemy) => {
         if (player.isSmashing) {
           this.handleEnemySmash(enemy);
-        } else {
+        } else if (!this.isInvulnerable) {
           this.handleDeath();
         }
       },
@@ -144,7 +158,6 @@ export class MainGame extends Scene {
       this.spawnPitGears(currentX + chunkWidth * 64, gapSize);
       currentX += (chunkWidth + gapSize) * 64;
     }
-    // spawnPyramid(this, this.platforms, 2000, height - 64, 5);
   }
 
   spawnPitGears(gapStartX, gapSize) {
@@ -177,6 +190,7 @@ export class MainGame extends Scene {
 
     this.player = new Player(this, 100, height - 250);
     this.player.setDepth(10);
+    if (this.isInvulnerable) this.player.setAlpha(0.5);
 
     this.cameras.main.setBounds(0, 0, levelWidth, height);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -189,19 +203,17 @@ export class MainGame extends Scene {
     if (this.player && this.player.active) {
       this.player.update();
       if (this.player.isSmashing) this.checkSmashHit();
-      // TRANSITION TO BOSS Has reached end of level
+      
+      // TRANSITION TO BOSS
       if (this.player.x > 7950) {
-        // Near the end of levelWidth 8000
         this.scene.start("BossBattle");
       }
 
-      if (this.player.y > this.scale.height + 100) {
+      // PIT CHECK
+      if (this.player.y > this.scale.height + 100 && !this.isInvulnerable) {
         this.handleDeath();
       }
     }
-    this.input.keyboard.on("keydown-NINE", () => {
-      this.scene.start("BossBattle");
-    });
   }
 
   checkSmashHit() {
@@ -244,12 +256,11 @@ export class MainGame extends Scene {
   }
 
   handleDeath() {
-    if (this.isRestarting) return;
+    if (this.isRestarting || this.isInvulnerable) return;
     this.isRestarting = true;
 
-    // Trigger visual feedback
     this.cameras.main.shake(250, 0.02);
-    this.cameras.main.flash(500, 150, 0, 0); // Red flash (duration, R, G, B)
+    this.cameras.main.flash(500, 150, 0, 0);
 
     this.player.setActive(false).setVisible(false);
     this.physics.pause();
