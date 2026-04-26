@@ -63,7 +63,7 @@ export class Player extends Physics.Arcade.Sprite {
       this.body.blocked.down &&
       currentTime > this.lastJumpTime + this.jumpCooldown
     ) {
-      this.setVelocityY(-1050);
+      this.setVelocityY(-1150);
       this.lastJumpTime = currentTime; // Reset the cooldown timer
     }
 

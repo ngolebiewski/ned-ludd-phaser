@@ -3,6 +3,7 @@ import { AUTO, Scale, Game } from "phaser";
 import { Boot } from "./scenes/Boot";
 import { Title } from "./scenes/Title";
 import { MainGame} from "./scenes/MainGame";
+import { BossBattle } from "./scenes/BossBattle";
 
 const config = {
     type: AUTO,
@@ -25,7 +26,7 @@ const config = {
         pixelArt: true,
     },
 
-    scene: [Boot, Title, MainGame], 
+    scene: [Boot, Title, MainGame, BossBattle], 
 };
 
 const StartGame = (parent) => {
