@@ -1,4 +1,5 @@
 import { Physics, Input } from "phaser";
+import { playSFX } from "../SoundEffects";
 
 export class Player extends Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -64,6 +65,7 @@ export class Player extends Physics.Arcade.Sprite {
       currentTime > this.lastJumpTime + this.jumpCooldown
     ) {
       this.setVelocityY(-1150);
+      playSFX("jump");
       this.lastJumpTime = currentTime; // Reset the cooldown timer
     }
 
@@ -75,6 +77,7 @@ export class Player extends Physics.Arcade.Sprite {
 
   smash() {
     this.isSmashing = true;
+    playSFX("hit");
     this.setVelocityX(0);
     this.play("smash");
 
