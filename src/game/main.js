@@ -17,7 +17,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 1000 },
-            debug: false // Set to true if you want to see hitboxes
+            debug: true // Set to true if you want to see hitboxes
         }
     },
     scale: {
