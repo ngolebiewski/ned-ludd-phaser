@@ -22,9 +22,18 @@ export class MainGame extends Scene {
 
     // 0. INITIALIZE ASSETS
     Soldier.createAnimations(this);
-    if (!this.sound.get("factory_song")) {
-      this.sound.play("factory_song", { loop: true, volume: 0.3 });
+
+    // Stop existing music if it exists
+    if (this.factoryMusic && this.factoryMusic.isPlaying) {
+      this.factoryMusic.stop();
     }
+
+    // Play the music
+    this.factoryMusic = this.sound.add("factory_song", {
+      loop: true,
+      volume: 0.5,
+    });
+    this.factoryMusic.play();
 
     // 1. CHEAT CODE LISTENERS
     // Toggle Invulnerability with 'I'
@@ -203,7 +212,7 @@ export class MainGame extends Scene {
     if (this.player && this.player.active) {
       this.player.update();
       if (this.player.isSmashing) this.checkSmashHit();
-      
+
       // TRANSITION TO BOSS
       if (this.player.x > 7950) {
         this.scene.start("BossBattle");

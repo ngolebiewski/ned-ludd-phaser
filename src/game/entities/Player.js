@@ -8,6 +8,9 @@ export class Player extends Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // TEST ONLY - remove later
+window.testSound = () => playSFX("test");
+
     this.setCollideWorldBounds(true);
     this.setGravityY(1000);
     this.lastJumpTime = 0;
