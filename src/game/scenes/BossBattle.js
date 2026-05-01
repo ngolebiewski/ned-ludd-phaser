@@ -15,51 +15,34 @@ export class BossBattle extends Scene {
     this.isInvulnerable = false;
     this.isGameOver = false;
 
-    // 1. MUSIC
+    // 1. MUSIC & ATMOSPHERE
     this.sound.stopAll();
     this.bossMusic = this.sound.add("factory_beatz");
     this.bossMusic.play({ loop: true, volume: 0.4, rate: 1.25 });
 
-    // 2. BACKGROUND
+    // 2. BACKGROUND GENERATION
     for (let x = 0; x < width; x += TILE_SIZE) {
       for (let y = 0; y < height; y += TILE_SIZE) {
         const v = PhaserMath.Between(-30, 30);
         const g = 110 + v;
-        const bgTile = this.add
-          .image(x + 32, y + 32, "factory", TILES.BG_TILE)
-          .setOrigin(0.5)
-          .setDepth(0)
-          .setAlpha(0.9)
-          .setTint(Display.Color.GetColor(g, g, g));
+        const bgTile = this.add.image(x + 32, y + 32, "factory", TILES.BG_TILE).setOrigin(0.5).setDepth(0).setAlpha(0.9).setTint(Display.Color.GetColor(g, g, g));
         bgTile.setAngle(PhaserMath.Between(0, 3) * 90);
       }
     }
 
-    // 3. ARENA
+    // 3. ARENA GEOMETRY
     this.platforms = this.physics.add.staticGroup();
-    // ONE layer of bricks at bottom
     const floorTopY = height - TILE_SIZE;
     for (let x = 0; x < width; x += TILE_SIZE) {
-      this.platforms
-        .create(x, floorTopY, "factory", TILES.BRICK)
-        .setOrigin(0)
-        .refreshBody();
+      this.platforms.create(x, floorTopY, "factory", TILES.BRICK).setOrigin(0).refreshBody();
     }
 
-    // Raised Ledges
+    // High ground ledges
     const ledgeY = floorTopY - TILE_SIZE * 4;
-    this.platforms
-      .create(0, ledgeY, "factory", TILES.BRICK_WORN)
-      .setOrigin(0)
-      .setScale(3, 1)
-      .refreshBody();
-    this.platforms
-      .create(width - 3 * TILE_SIZE, ledgeY, "factory", TILES.BRICK_WORN)
-      .setOrigin(0)
-      .setScale(3, 1)
-      .refreshBody();
+    this.platforms.create(0, ledgeY, "factory", TILES.BRICK_WORN).setOrigin(0).setScale(3, 1).refreshBody();
+    this.platforms.create(width - 3 * TILE_SIZE, ledgeY, "factory", TILES.BRICK_WORN).setOrigin(0).setScale(3, 1).refreshBody();
 
-    // 4. PARTICLES
+    // 4. VISUAL EFFECTS
     this.particles = this.add.particles(0, 0, "factory", {
       frame: TILES.SMOKE,
       speed: 150,
@@ -71,126 +54,100 @@ export class BossBattle extends Scene {
 
     // 5. ENTITIES
     this.player = new Player(this, 100, floorTopY);
-    this.player.setOrigin(0.5, 1); // Pivot at feet
-    this.player.setDepth(10);
+    this.player.setOrigin(0.5, 1).setDepth(10);
 
     LaptopBoss.createAnimations(this);
     this.boss = new LaptopBoss(this, width - 200, floorTopY);
-    this.boss.setOrigin(0.5, 1); // Pivot at feet
+    this.boss.setOrigin(0.5, 1);
 
-    // 6. INTRO TEXT
+    // 6. BOSS INTRO
     this.showTerminalText(
       "YOU HAVE DESTROYED MY MACHINES!\nYOU CAN ONLY DELAY THE FUTURE!\n\nSO SORRY YOU'RE OUT OF WORK...\nNOW YOU'LL BE SORRY!",
-      () => {
-        this.boss.isActive = true;
-      },
+      () => { this.boss.isActive = true; }
     );
 
-    // 7. COLLISIONS
+    // 7. PHYSICS & COLLISIONS
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.boss, this.platforms);
+
+    // Standard contact damage (Non-smashing)
     this.physics.add.overlap(this.player, this.boss, () => {
-      if (this.player.isSmashing && !this.boss.isBeingHit) {
-        this.boss.takeDamage();
-        this.player.setVelocityY(-500);
-        if (this.boss.hp <= 0) this.handleWin();
-      } else if (
-        !this.player.isSmashing &&
-        !this.isInvulnerable &&
-        this.boss.isActive
-      ) {
+      if (!this.player.isSmashing && !this.isInvulnerable && this.boss.isActive) {
         this.handlePlayerHit(false);
       }
     });
   }
 
+  // --- ATTACK DETECTION ---
+  checkSmashHit(hitSource) {
+    const source = hitSource || this.player;
+    this.physics.overlap(source, this.boss, () => {
+      if (!this.boss.isBeingHit && this.boss.isActive) {
+        this.boss.takeDamage();
+        this.particles.emitParticleAt(this.boss.x, this.boss.y - 50, 20);
+        this.cameras.main.shake(100, 0.01);
+        this.player.setVelocityY(-400); // Combat bounce
+        if (this.boss.hp <= 0) this.handleWin();
+      }
+    });
+  }
+
+  // --- TERMINAL TEXT EFFECT ---
   showTerminalText(content, onComplete) {
     const { width, height } = this.scale;
-    const label = this.add
-      .text(width / 2, height / 2, "", {
-        fontFamily: "Departure Mono",
-        fontSize: "22px",
-        color: "#00ff00",
-        align: "center",
-        stroke: "#000",
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setDepth(100);
+    const label = this.add.text(width / 2, height / 2, "", {
+      fontFamily: "Departure Mono", fontSize: "22px", color: "#00ff00",
+      align: "center", stroke: "#000", strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(100);
 
     let i = 0;
     this.time.addEvent({
-      delay: 40,
-      repeat: content.length - 1,
+      delay: 40, repeat: content.length - 1,
       callback: () => {
-        label.text += content[i];
-        i++;
+        label.text += content[i++];
         if (i === content.length) {
           this.time.delayedCall(1500, () => {
-            this.tweens.add({
-              targets: label,
-              alpha: 0,
-              duration: 500,
-              onComplete: () => {
-                label.destroy();
-                if (onComplete) onComplete();
-              },
-            });
+            this.tweens.add({ targets: label, alpha: 0, duration: 500, onComplete: () => { label.destroy(); if (onComplete) onComplete(); }});
           });
         }
       },
     });
   }
 
+  // --- DAMAGE HANDLING ---
   handlePlayerHit(isLaser = false) {
     if (this.isGameOver || this.isInvulnerable) return;
-    this.playerHP--;
-    isLaser
-      ? this.cameras.main.flash(200, 0, 255, 0)
-      : this.cameras.main.flash(200, 255, 0, 0);
+    
+    // Lasers deal double damage for "deadliness"
+    this.playerHP -= isLaser ? 2 : 1; 
+    
+    // Visual feedback (Green for laser, Red for contact)
+    isLaser ? this.cameras.main.flash(200, 0, 255, 0) : this.cameras.main.flash(200, 255, 0, 0);
     this.cameras.main.shake(200, 0.02);
-    if (this.playerHP <= 0) this.handleGameOver();
-    else {
+
+    if (this.playerHP <= 0) {
+      this.handleGameOver();
+    } else {
       this.isInvulnerable = true;
       this.tweens.add({
-        targets: this.player,
-        alpha: 0.5,
-        yoyo: true,
-        repeat: 5,
-        duration: 100,
-        onComplete: () => {
-          this.player.alpha = 1;
-          this.isInvulnerable = false;
-        },
+        targets: this.player, alpha: 0.5, yoyo: true, repeat: 5, duration: 100,
+        onComplete: () => { this.player.alpha = 1; this.isInvulnerable = false; }
       });
     }
   }
 
+  // --- SCENE TRANSITIONS ---
   handleGameOver() {
     this.isGameOver = true;
     this.physics.pause();
     this.bossMusic.stop();
-    const { width, height } = this.scale;
-    const goText = this.add
-      .text(width / 2, height / 2, "GAME OVER", {
-        fontFamily: "Departure Mono",
-        fontSize: "80px",
-        color: "#ff0000",
-        stroke: "#000",
-        strokeThickness: 8,
-      })
-      .setOrigin(0.5)
-      .setDepth(200)
-      .setScale(0);
-    this.tweens.add({
-      targets: goText,
-      scale: 1,
-      duration: 500,
-      ease: "Back.easeOut",
-      onComplete: () => {
-        this.time.delayedCall(3000, () => this.scene.start("Title"));
-      },
-    });
+    const goText = this.add.text(this.scale.width / 2, this.scale.height / 2, "GAME OVER", {
+      fontFamily: "Departure Mono", fontSize: "80px", color: "#ff0000", stroke: "#000", strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(200).setScale(0);
+    
+    this.tweens.add({ targets: goText, scale: 1, duration: 500, ease: "Back.easeOut", onComplete: () => {
+      this.time.delayedCall(3000, () => this.scene.start("Title"));
+    }});
   }
 
   handleWin() {
@@ -198,15 +155,9 @@ export class BossBattle extends Scene {
     this.boss.isActive = false;
     this.bossMusic.setRate(1.0);
     this.time.delayedCall(1000, () => {
-      this.showTerminalText(
-        "YOU ARE VICTORIOUS TODAY,\nBUT THE MACHINES ARE UNSTOPPABLE",
-        () => {
-          this.time.delayedCall(2000, () => {
-            this.bossMusic.stop();
-            this.scene.start("Title");
-          });
-        },
-      );
+      this.showTerminalText("YOU ARE VICTORIOUS TODAY,\nBUT THE MACHINES ARE UNSTOPPABLE", () => {
+        this.time.delayedCall(2000, () => { this.bossMusic.stop(); this.scene.start("Title"); });
+      });
     });
   }
 
@@ -214,6 +165,11 @@ export class BossBattle extends Scene {
     if (!this.isGameOver) {
       this.player.update();
       this.boss.update(time);
+      
+      // Continuous smash detection while animation is active
+      if (this.player.isSmashing) {
+        this.checkSmashHit(this.player.attackHitbox);
+      }
     }
   }
 }

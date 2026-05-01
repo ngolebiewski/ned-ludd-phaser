@@ -8,26 +8,27 @@ export class Player extends Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // TEST ONLY - remove later
-window.testSound = () => playSFX("test");
-
     this.setCollideWorldBounds(true);
     this.setGravityY(1000);
     this.lastJumpTime = 0;
-    this.jumpCooldown = 400; // 400ms delay between jumps
+    this.jumpCooldown = 400;
 
-    // Match the 128x192 sprite size better
+    // Standard player body
     this.setBodySize(64, 160);
     this.setOffset(32, 32);
 
+    // --- NEW: THE INVISIBLE ATTACK HITBOX ---
+    // Create a tiny invisible sprite for the attack zone
+    this.attackHitbox = scene.add.rectangle(0, 0, 40, 120, 0xffffff, 0);
+    scene.physics.add.existing(this.attackHitbox);
+    this.attackHitbox.body.setAllowGravity(false);
+    this.attackHitbox.body.enable = false; // Keep it off until we smash
+    // -----------------------------------------
+
     this.cursors = scene.input.keyboard.createCursorKeys();
-
-    // Define the "Space" key specifically to avoid the "Phaser.Input" global error
     this.spaceKey = scene.input.keyboard.addKey(Input.Keyboard.KeyCodes.SPACE);
-
     this.isSmashing = false;
 
-    // Ensure animations exist (Safe check if Boot didn't do it)
     if (!scene.anims.exists("smash")) {
       scene.anims.create({
         key: "smash",
@@ -46,13 +47,10 @@ window.testSound = () => playSFX("test");
   update() {
     if (this.isSmashing) return;
 
-    // LEFT (Native)
     if (this.cursors.left.isDown) {
       this.setVelocityX(-240);
       this.setFlipX(false);
-    }
-    // RIGHT (Flipped)
-    else if (this.cursors.right.isDown) {
+    } else if (this.cursors.right.isDown) {
       this.setVelocityX(240);
       this.setFlipX(true);
     } else {
@@ -60,8 +58,6 @@ window.testSound = () => playSFX("test");
     }
 
     const currentTime = this.scene.time.now;
-
-    // Jump (Up or Shift)
     if (
       (this.cursors.up.isDown || this.cursors.shift.isDown) &&
       this.body.blocked.down &&
@@ -69,10 +65,9 @@ window.testSound = () => playSFX("test");
     ) {
       this.setVelocityY(-1150);
       playSFX("jump");
-      this.lastJumpTime = currentTime; // Reset the cooldown timer
+      this.lastJumpTime = currentTime;
     }
 
-    // Smash (Using the spaceKey instance instead of the global Phaser call)
     if (Input.Keyboard.JustDown(this.spaceKey)) {
       this.smash();
     }
@@ -84,17 +79,27 @@ window.testSound = () => playSFX("test");
     this.setVelocityX(0);
     this.play("smash");
 
-    // Trigger the hit detection in MainGame
+    // Position the attack hitbox in front of the player
+    // reach of 40-50px usually solves the "moving same direction" issue
+    const reach = 50; 
+    const hx = this.flipX ? this.x + reach : this.x - reach;
+    const hy = this.y - 10; // Positioned around chest/arm height
+
+    this.attackHitbox.setPosition(hx, hy);
+    this.attackHitbox.body.enable = true;
+
+    // Trigger the actual overlap check in MainGame using our hitbox
     this.scene.time.delayedCall(150, () => {
+      // We pass the hitbox to the MainGame's detection logic
       if (this.scene.checkSmashHit) {
-        this.scene.checkSmashHit();
+        // Update checkSmashHit to use the hitbox instead of 'this'
+        this.scene.checkSmashHit(this.attackHitbox);
       }
     });
 
     this.once("animationcomplete", () => {
       this.isSmashing = false;
-      // No walk animation defined in your JSON tags yet (just a static frame),
-      // so we stop the animation or go back to frame 0.
+      this.attackHitbox.body.enable = false; // Disable the hitbox
       this.setFrame("ned_smasher 0.aseprite");
     });
   }

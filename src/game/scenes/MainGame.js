@@ -225,8 +225,16 @@ export class MainGame extends Scene {
     }
   }
 
-  checkSmashHit() {
-    this.physics.overlap(this.player, this.machineGroup, (player, part) => {
+  // Inside MainGame.js
+  checkSmashHit(hitSource) {
+    // Use the hitSource (the invisible rectangle) instead of the player
+    const source = hitSource || this.player;
+
+    this.physics.overlap(source, this.enemyGroup, (hitbox, enemy) => {
+      this.handleEnemySmash(enemy);
+    });
+
+    this.physics.overlap(source, this.machineGroup, (hitbox, part) => {
       if (!part.isBeingHit) this.handleMachineDamage(part);
     });
   }
