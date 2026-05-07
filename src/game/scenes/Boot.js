@@ -1,4 +1,5 @@
   import { Scene } from "phaser";
+  import { preloadSFX } from "../SoundEffects";
 
   export class Boot extends Scene {
     constructor() {
@@ -8,6 +9,7 @@
     preload() {
       this.load.audio('factory_beatz', 'sound/factory_floor.mp3');
       this.load.audio('factory_song', 'sound/factory-downbeat.mp3');
+      preloadSFX()
 
       // 🧱 ENVIRONMENT
       this.load.spritesheet("factory", "assets/factory_set.png", {

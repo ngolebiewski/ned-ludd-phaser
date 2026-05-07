@@ -2,6 +2,7 @@ import { Scene, Math as PhaserMath, Display, Geom } from "phaser";
 import { Player } from "../entities/Player";
 import { LaptopBoss } from "../entities/LaptopBoss";
 import { TILES } from "../../Constants";
+import { playSFX } from "../SoundEffects";
 
 export class BossBattle extends Scene {
   constructor() {
@@ -118,6 +119,8 @@ export class BossBattle extends Scene {
   handlePlayerHit(isLaser = false) {
     if (this.isGameOver || this.isInvulnerable) return;
     
+    playSFX("hurtPlayer")
+
     // Lasers deal double damage for "deadliness"
     this.playerHP -= isLaser ? 2 : 1; 
     
