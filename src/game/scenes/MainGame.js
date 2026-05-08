@@ -1,12 +1,7 @@
 import { Scene, Math as PhaserMath, Display } from "phaser";
 import { Player } from "../entities/Player";
 import { Soldier } from "../entities/Soldier";
-import {
-  TILES,
-  spawnWindow,
-  spawnMachine,
-  spawnGear,
-} from "../../Constants";
+import { TILES, spawnWindow, spawnMachine, spawnGear } from "../../Constants";
 import { playSFX } from "../SoundEffects";
 
 export class MainGame extends Scene {
@@ -42,15 +37,12 @@ export class MainGame extends Scene {
       this.scene.start("BossBattle");
     });
 
-    this.input.keyboard.on('keydown-EIGHT', () => {
-          // 2. Toggle the visibility of the physics debug graphics
-          if (this.physics.world.drawDebug) {
-              this.physics.world.drawDebug = false;
-              this.physics.world.debugGraphic.clear();
-          } else {
-              this.physics.world.drawDebug = true;
-          }
-      });
+    // this.input.keyboard.on("keydown-EIGHT", () => {
+    //   this.physics.world.drawDebug = !this.physics.world.drawDebug;
+    //   if (!this.physics.world.drawDebug && this.physics.world.debugGraphic) {
+    //     this.physics.world.debugGraphic.clear();
+    //   }
+    // });
 
     // 2. BACKGROUND
     for (let x = 0; x < levelWidth; x += 64) {
@@ -85,12 +77,12 @@ export class MainGame extends Scene {
     this.setupPlayerAndSystems(levelWidth, height);
 
     // 7. MACHINES (Increased density with 'Nudge' logic)
-    const spawn_dist = 600; 
+    const spawn_dist = 600;
     for (let x = spawn_dist; x < levelWidth - spawn_dist; x += spawn_dist) {
       if (Math.random() > 0.3) {
         this.spawnMachineSafely(
           x,
-          Math.random() > 0.5 ? TILES.JENNY : TILES.STOCKING
+          Math.random() > 0.5 ? TILES.JENNY : TILES.STOCKING,
         );
       }
     }
@@ -110,14 +102,17 @@ export class MainGame extends Scene {
         }
       },
       null,
-      this
+      this,
     );
   }
 
   generateTerrain(levelWidth, height) {
     let currentX = 0;
     for (let i = 0; i < 12; i++) {
-      this.platforms.create(i * 64, height - 64, "factory", TILES.BRICK).setOrigin(0).refreshBody();
+      this.platforms
+        .create(i * 64, height - 64, "factory", TILES.BRICK)
+        .setOrigin(0)
+        .refreshBody();
     }
     currentX = 12 * 64;
 
@@ -127,21 +122,35 @@ export class MainGame extends Scene {
 
       for (let i = 0; i < chunkWidth; i++) {
         const xPos = currentX + i * 64;
-        this.platforms.create(xPos, height - 64, "factory", TILES.BRICK).setOrigin(0).setDepth(5).refreshBody();
+        this.platforms
+          .create(xPos, height - 64, "factory", TILES.BRICK)
+          .setOrigin(0)
+          .setDepth(5)
+          .refreshBody();
         if (isDoubleThick) {
-          this.platforms.create(xPos, height - 128, "factory", TILES.BRICK_WORN).setOrigin(0).setDepth(5).refreshBody();
+          this.platforms
+            .create(xPos, height - 128, "factory", TILES.BRICK_WORN)
+            .setOrigin(0)
+            .setDepth(5)
+            .refreshBody();
         }
       }
 
       if (Math.random() > 0.4) {
-        this.enemyGroup.add(new Soldier(this, currentX + 128, height - 130, "patrol"));
+        this.enemyGroup.add(
+          new Soldier(this, currentX + 128, height - 130, "patrol"),
+        );
       }
 
       if (Math.random() > 0.6) {
         const t2X = currentX + 128;
         const t2Y = height - 352;
         for (let j = 0; j < 5; j++) {
-          this.platforms.create(t2X + j * 64, t2Y, "factory", TILES.BRICK_WORN).setOrigin(0).setDepth(5).refreshBody();
+          this.platforms
+            .create(t2X + j * 64, t2Y, "factory", TILES.BRICK_WORN)
+            .setOrigin(0)
+            .setDepth(5)
+            .refreshBody();
         }
         this.enemyGroup.add(new Soldier(this, t2X + 64, t2Y - 10, "patrol"));
       }
@@ -156,8 +165,18 @@ export class MainGame extends Scene {
     const gearY = this.scale.height + 50;
     for (let i = 0; i < gapSize; i++) {
       const gx = gapStartX + i * 64 + 32;
-      spawnGear(this, gx, gearY, 27 + PhaserMath.Between(0, 4), 2, 0.4, i % 2 === 0 ? 1 : -1)
-        .setDepth(1).setAlpha(0.4).setTint(0x333333);
+      spawnGear(
+        this,
+        gx,
+        gearY,
+        27 + PhaserMath.Between(0, 4),
+        2,
+        0.4,
+        i % 2 === 0 ? 1 : -1,
+      )
+        .setDepth(1)
+        .setAlpha(0.4)
+        .setTint(0x333333);
     }
   }
 
@@ -188,14 +207,17 @@ export class MainGame extends Scene {
       this.player.update();
       if (this.player.isSmashing) this.checkSmashHit();
       if (this.player.x > 7950) this.scene.start("BossBattle");
-      if (this.player.y > this.scale.height + 100 && !this.isInvulnerable) this.handleDeath();
+      if (this.player.y > this.scale.height + 100 && !this.isInvulnerable)
+        this.handleDeath();
     }
   }
 
   checkSmashHit(hitSource) {
     const source = hitSource || this.player;
-    this.physics.overlap(source, this.enemyGroup, (hitbox, enemy) => this.handleEnemySmash(enemy));
-    
+    this.physics.overlap(source, this.enemyGroup, (hitbox, enemy) =>
+      this.handleEnemySmash(enemy),
+    );
+
     // Now overlapping with the Machine Container
     this.physics.overlap(source, this.machineGroup, (hitbox, machine) => {
       this.handleMachineDamage(machine);
@@ -206,7 +228,7 @@ export class MainGame extends Scene {
     if (!enemy.active) return;
     this.particles.emitParticleAt(enemy.x, enemy.y - 30, 15);
     this.cameras.main.shake(100, 0.01);
-    playSFX("hurt")
+    playSFX("hurt");
     enemy.setActive(false);
     enemy.body.setEnable(false);
     enemy.setTint(0xff0000);
@@ -214,7 +236,9 @@ export class MainGame extends Scene {
       targets: enemy,
       y: enemy.y - 250,
       x: enemy.x + (this.player.flipX ? -300 : 300),
-      angle: 720, alpha: 0, duration: 800,
+      angle: 720,
+      alpha: 0,
+      duration: 800,
       onComplete: () => enemy.destroy(),
     });
   }
@@ -254,7 +278,7 @@ export class MainGame extends Scene {
     });
 
     if (machine.health <= 0) {
-      playSFX("machine_break")
+      playSFX("machine_break");
       // Big final paricle burst when destroyed
       for (let i = 0; i < 40; i++) {
         const randX = PhaserMath.Between(0, width);
@@ -267,8 +291,8 @@ export class MainGame extends Scene {
 
   handleDeath() {
     if (this.isRestarting || this.isInvulnerable) return;
-    playSFX("death")
-    playSFX("hurtPlayer")
+    playSFX("death");
+    playSFX("hurtPlayer");
     this.isRestarting = true;
     this.cameras.main.shake(250, 0.02);
     this.cameras.main.flash(500, 150, 0, 0);
@@ -283,8 +307,11 @@ export class MainGame extends Scene {
   spawnGrimyWindow(x, y) {
     TILES.WINDOW.forEach((row, rowIndex) => {
       row.forEach((frame, colIndex) => {
-        this.add.image(x + colIndex * 64, y + rowIndex * 64, "factory", frame)
-          .setOrigin(0).setTint(0x888888).setDepth(0);
+        this.add
+          .image(x + colIndex * 64, y + rowIndex * 64, "factory", frame)
+          .setOrigin(0)
+          .setTint(0x888888)
+          .setDepth(0);
       });
     });
   }
@@ -294,18 +321,20 @@ export class MainGame extends Scene {
     const machineWidth = layout[0].length * TILE_SIZE;
 
     // Find tiles in the immediate vicinity
-    const floorTiles = this.platforms.getChildren().filter((p) => 
-      Math.abs(p.x - targetX) < 256
-    );
+    const floorTiles = this.platforms
+      .getChildren()
+      .filter((p) => Math.abs(p.x - targetX) < 256);
 
     if (floorTiles.length > 0) {
       // Find the highest surface tile
-      const highestTile = floorTiles.reduce((prev, curr) => (prev.y < curr.y ? prev : curr));
-      
+      const highestTile = floorTiles.reduce((prev, curr) =>
+        prev.y < curr.y ? prev : curr,
+      );
+
       // Identify the "island" boundaries at this floor height
-      const sameLevelTiles = floorTiles.filter(p => p.y === highestTile.y);
-      const minX = Math.min(...sameLevelTiles.map(p => p.x));
-      const maxX = Math.max(...sameLevelTiles.map(p => p.x)) + TILE_SIZE;
+      const sameLevelTiles = floorTiles.filter((p) => p.y === highestTile.y);
+      const minX = Math.min(...sameLevelTiles.map((p) => p.x));
+      const maxX = Math.max(...sameLevelTiles.map((p) => p.x)) + TILE_SIZE;
 
       let finalX = targetX;
 
@@ -319,9 +348,9 @@ export class MainGame extends Scene {
         spawnMachine(
           this,
           finalX,
-          highestTile.y - (layout.length * TILE_SIZE),
+          highestTile.y - layout.length * TILE_SIZE,
           layout,
-          this.machineGroup
+          this.machineGroup,
         );
       }
     }
