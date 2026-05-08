@@ -15,13 +15,13 @@ export class Player extends Physics.Arcade.Sprite {
     this.setBodySize(64, 160);
     this.setOffset(32, 32);
 
-    // --- NEW: THE INVISIBLE ATTACK HITBOX ---
+    // --- INVISIBLE ATTACK HITBOX ---
     // Create a tiny invisible sprite for the attack zone
     this.attackHitbox = scene.add.rectangle(0, 0, 40, 120, 0xffffff, 0);
     scene.physics.add.existing(this.attackHitbox);
     this.attackHitbox.body.setAllowGravity(false);
     this.attackHitbox.body.enable = false;
-    // -----------------------------------------
+    // ---------------------------------
 
     // Keyboard inputs: arrows + WASD + space
     this.cursors = scene.input.keyboard.createCursorKeys();
@@ -35,9 +35,8 @@ export class Player extends Physics.Arcade.Sprite {
 
     // Touch control state
     this.touchMovementDirection = 0; // -1 (left), 0 (none), 1 (right)
-    this.swipeStartX = 0;
-    this.swipeStartY = 0;
     this.touchPointerActive = false;
+    this.touchPointerId = null; // Track which pointer is for movement
     this.isSmashing = false;
 
     // Set up touch listeners
@@ -62,18 +61,21 @@ export class Player extends Physics.Arcade.Sprite {
   }
 
   onTouchStart(pointer) {
-    // Record initial touch position for swipe detection
-    this.touchPointerActive = true;
-    this.swipeStartX = pointer.x;
-    this.swipeStartY = pointer.y;
+    // Record initial touch position for movement/swipe detection
+    if (!this.touchPointerActive) {
+      this.touchPointerActive = true;
+      this.touchPointerId = pointer.id;
+      this.swipeStartX = pointer.x;
+      this.swipeStartY = pointer.y;
+      this.touchStartTime = this.scene.time.now;
+    }
   }
 
   onTouchMove(pointer) {
+    // Only process if this is our movement pointer
+    if (pointer.id !== this.touchPointerId || !this.touchPointerActive) return;
+
     // Determine movement direction based on which half of screen is held
-    if (!this.touchPointerActive) return;
-
-    const deltaX = pointer.x - this.swipeStartX;
-
     const screenCenterX = this.scene.scale.width / 2;
     if (pointer.x < screenCenterX) {
       this.touchMovementDirection = -1; // Left side = move left
@@ -83,19 +85,23 @@ export class Player extends Physics.Arcade.Sprite {
   }
 
   onTouchEnd(pointer) {
-    // Detect swipe up (jump) vs tap (hit)
+    // Only process if this is our movement pointer
+    if (pointer.id !== this.touchPointerId) return;
+
     this.touchPointerActive = false;
     this.touchMovementDirection = 0;
+    this.touchPointerId = null;
 
     const deltaY = this.swipeStartY - pointer.y;
     const deltaX = Math.abs(pointer.x - this.swipeStartX);
+    const touchDuration = this.scene.time.now - this.touchStartTime;
 
-    // Swipe up: vertical distance > 40px and not too horizontal
-    if (deltaY > 40 && deltaX < 50) {
+    // Swipe up: vertical distance > 40px and not too horizontal, quick movement
+    if (deltaY > 40 && deltaX < 50 && touchDuration < 300) {
       this.attemptJump();
     }
-    // Tap: minimal movement = hit
-    else if (deltaY < 20 && deltaX < 20) {
+    // Tap: minimal movement, quick tap = hit
+    else if (deltaY < 20 && deltaX < 20 && touchDuration < 200) {
       this.smash();
     }
   }
