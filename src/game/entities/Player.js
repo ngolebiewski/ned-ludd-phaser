@@ -6,24 +6,31 @@ export class Player extends Physics.Arcade.Sprite {
     super(scene, x, y, "player", "ned_smasher 0.aseprite");
     scene.add.existing(this);
     scene.physics.add.existing(this);
+
     this.setCollideWorldBounds(true);
     this.setGravityY(1000);
+
     this.lastJumpTime = 0;
     this.jumpCooldown = 400;
 
-    // Standard player body
+    // ✅ COYOTE TIME
+    this.coyoteTime = 120;
+    this.lastGroundedTime = 0;
+
+    // ✅ TOUCH MOMENTUM WINDOW
+    this.touchMomentumUntil = 0;
+
+    // Body
     this.setBodySize(64, 160);
     this.setOffset(32, 32);
 
-    // --- INVISIBLE ATTACK HITBOX ---
-    // Create a tiny invisible sprite for the attack zone
+    // Attack hitbox
     this.attackHitbox = scene.add.rectangle(0, 0, 40, 120, 0xffffff, 0);
     scene.physics.add.existing(this.attackHitbox);
     this.attackHitbox.body.setAllowGravity(false);
     this.attackHitbox.body.enable = false;
-    // ---------------------------------
 
-    // Keyboard inputs: arrows + WASD + space
+    // Keyboard
     this.cursors = scene.input.keyboard.createCursorKeys();
     this.wasdKeys = scene.input.keyboard.addKeys({
       W: Input.Keyboard.KeyCodes.W,
@@ -33,18 +40,17 @@ export class Player extends Physics.Arcade.Sprite {
     });
     this.spaceKey = scene.input.keyboard.addKey(Input.Keyboard.KeyCodes.SPACE);
 
-    // Touch control state
-    this.touchMovementDirection = 0; // -1 (left), 0 (none), 1 (right)
+    // Touch
+    this.touchMovementDirection = 0;
     this.touchPointerActive = false;
-    this.touchPointerId = null; // Track which pointer is for movement
+    this.touchPointerId = null;
     this.isSmashing = false;
 
-    // Set up touch listeners
-    scene.input.on("pointerdown", (pointer) => this.onTouchStart(pointer));
-    scene.input.on("pointermove", (pointer) => this.onTouchMove(pointer));
-    scene.input.on("pointerup", (pointer) => this.onTouchEnd(pointer));
+    scene.input.on("pointerdown", (p) => this.onTouchStart(p));
+    scene.input.on("pointermove", (p) => this.onTouchMove(p));
+    scene.input.on("pointerup", (p) => this.onTouchEnd(p));
 
-    // Animation setup
+    // Animation
     if (!scene.anims.exists("smash")) {
       scene.anims.create({
         key: "smash",
@@ -60,125 +66,168 @@ export class Player extends Physics.Arcade.Sprite {
     }
   }
 
+  // =========================
+  // TOUCH
+  // =========================
+
   onTouchStart(pointer) {
-    // Record initial touch position for movement/swipe detection
     if (!this.touchPointerActive) {
       this.touchPointerActive = true;
       this.touchPointerId = pointer.id;
+
       this.swipeStartX = pointer.x;
       this.swipeStartY = pointer.y;
-      this.touchStartTime = this.scene.time.now;
     }
   }
 
   onTouchMove(pointer) {
-    // Only process if this is our movement pointer
-    if (pointer.id !== this.touchPointerId || !this.touchPointerActive) return;
+    if (pointer.id !== this.touchPointerId) return;
 
-    // Determine movement direction based on which half of screen is held
-    const screenCenterX = this.scene.scale.width / 2;
-    if (pointer.x < screenCenterX) {
-      this.touchMovementDirection = -1; // Left side = move left
-    } else {
-      this.touchMovementDirection = 1; // Right side = move right
-    }
+    const mid = this.scene.scale.width / 2;
+    this.touchMovementDirection = pointer.x < mid ? -1 : 1;
   }
 
   onTouchEnd(pointer) {
-    // Only process if this is our movement pointer
     if (pointer.id !== this.touchPointerId) return;
 
     this.touchPointerActive = false;
-    this.touchMovementDirection = 0;
     this.touchPointerId = null;
 
     const deltaY = this.swipeStartY - pointer.y;
-    const deltaX = Math.abs(pointer.x - this.swipeStartX);
-    const touchDuration = this.scene.time.now - this.touchStartTime;
+    const deltaX = pointer.x - this.swipeStartX;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const now = this.scene.time.now;
 
-    // Swipe up: vertical distance > 40px and not too horizontal, quick movement
-    if (deltaY > 40 && deltaX < 50 && touchDuration < 300) {
+    // ✅ JUMP
+    if (deltaY > 80) {
+      if (Math.abs(deltaX) > 30) {
+        this.touchMovementDirection = deltaX > 0 ? 1 : -1;
+
+        // ✅ short momentum after swipe
+        this.touchMomentumUntil = now + 150;
+      }
+
       this.attemptJump();
     }
-    // Tap: minimal movement, quick tap = hit
-    else if (deltaY < 20 && deltaX < 20 && touchDuration < 200) {
+
+    // ✅ TAP = SMASH
+    else if (distance < 40) {
+      this.touchMovementDirection = 0;
       this.smash();
     }
-  }
 
-  attemptJump() {
-    // Jump if grounded and cooldown has passed
-    const currentTime = this.scene.time.now;
-    if (this.body.blocked.down && currentTime > this.lastJumpTime + this.jumpCooldown) {
-      this.setVelocityY(-1150);
-      playSFX("jump");
-      this.lastJumpTime = currentTime;
+    // ✅ OTHERWISE STOP
+    else {
+      this.touchMovementDirection = 0;
     }
   }
 
+  // =========================
+  // JUMP (WITH COYOTE TIME)
+  // =========================
+
+  attemptJump() {
+    const now = this.scene.time.now;
+
+    const canJump = now < this.lastGroundedTime + this.coyoteTime;
+
+    if (canJump && now > this.lastJumpTime + this.jumpCooldown) {
+      this.setVelocityY(-1150);
+
+      // ✅ ADD THIS: horizontal boost
+      if (this.touchMovementDirection !== 0) {
+        const boost = this.touchMovementDirection * 120;
+
+        // add to current velocity instead of replacing it
+        this.setVelocityX(this.body.velocity.x + boost);
+      }
+
+      playSFX("jump");
+      this.lastJumpTime = now;
+    }
+  }
+
+  // =========================
+  // UPDATE
+  // =========================
+
   update() {
-    // Don't process input while smashing
     if (this.isSmashing) return;
 
-    // Keyboard input (arrows + WASD)
+    const now = this.scene.time.now;
+
+    // ✅ clear leftover momentum after short window
+    if (
+      !this.touchPointerActive &&
+      this.touchMomentumUntil &&
+      now > this.touchMomentumUntil
+    ) {
+      this.touchMovementDirection = 0;
+    }
+
+    // Track last grounded time (for coyote time)
+    if (this.body.blocked.down) {
+      this.lastGroundedTime = now;
+    }
+
     const moveLeft = this.cursors.left.isDown || this.wasdKeys.A.isDown;
     const moveRight = this.cursors.right.isDown || this.wasdKeys.D.isDown;
 
-    // Touch input
-    const touchMoveLeft = this.touchMovementDirection === -1;
-    const touchMoveRight = this.touchMovementDirection === 1;
+    const touchLeft = this.touchMovementDirection === -1;
+    const touchRight = this.touchMovementDirection === 1;
 
-    // Combined movement: keyboard OR touch
-    if (moveLeft || touchMoveLeft) {
+    // ✅ Continuous movement (THIS fixes mobile)
+    if (moveLeft || touchLeft) {
       this.setVelocityX(-240);
       this.setFlipX(false);
-    } else if (moveRight || touchMoveRight) {
+    } else if (moveRight || touchRight) {
       this.setVelocityX(240);
       this.setFlipX(true);
     } else {
       this.setVelocityX(0);
     }
 
-    // Jump: up arrow or W or S (keyboard only, touch uses swipe)
-    const currentTime = this.scene.time.now;
+    // Keyboard jump
     if (
-      (this.cursors.up.isDown || this.wasdKeys.W.isDown || this.wasdKeys.S.isDown) &&
-      this.body.blocked.down &&
-      currentTime > this.lastJumpTime + this.jumpCooldown
+      (this.cursors.up.isDown ||
+        this.wasdKeys.W.isDown ||
+        this.wasdKeys.S.isDown) &&
+      now < this.lastGroundedTime + this.coyoteTime &&
+      now > this.lastJumpTime + this.jumpCooldown
     ) {
       this.setVelocityY(-1150);
       playSFX("jump");
-      this.lastJumpTime = currentTime;
+      this.lastJumpTime = now;
     }
 
-    // Hit/smash: space bar (keyboard only, touch uses tap)
     if (Input.Keyboard.JustDown(this.spaceKey)) {
       this.smash();
     }
   }
 
+  // =========================
+  // SMASH
+  // =========================
+
   smash() {
-    // Start smash animation and enable attack hitbox
     this.isSmashing = true;
     playSFX("hit");
     this.setVelocityX(0);
     this.play("smash");
 
-    // Position the attack hitbox in front of the player
     const reach = 50;
     const hx = this.flipX ? this.x + reach : this.x - reach;
-    const hy = this.y - 10; // Positioned around chest/arm height
+    const hy = this.y - 10;
+
     this.attackHitbox.setPosition(hx, hy);
     this.attackHitbox.body.enable = true;
 
-    // Trigger hit detection midway through animation
     this.scene.time.delayedCall(150, () => {
       if (this.scene.checkSmashHit) {
         this.scene.checkSmashHit(this.attackHitbox);
       }
     });
 
-    // Reset after animation completes
     this.once("animationcomplete", () => {
       this.isSmashing = false;
       this.attackHitbox.body.enable = false;
