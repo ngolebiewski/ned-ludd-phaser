@@ -319,11 +319,26 @@ export class MainGame extends Scene {
   spawnMachineSafely(targetX, layout) {
     const TILE_SIZE = 64;
     const machineWidth = layout[0].length * TILE_SIZE;
+    const machineHeight = layout.length * TILE_SIZE;
+
+    // Try multiple X positions: back a few tiles, then forward a few
+    const offsets = [0, -TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE, TILE_SIZE * 2];
+
+    for (const offset of offsets) {
+      const tryX = targetX + offset;
+      if (this.trySpawnMachineAt(tryX, layout, machineWidth, machineHeight)) {
+        return; // Success, spawn and exit
+      }
+    }
+  }
+
+  trySpawnMachineAt(tryX, layout, machineWidth, machineHeight) {
+    const TILE_SIZE = 64;
 
     // Find tiles in the immediate vicinity
     const floorTiles = this.platforms
       .getChildren()
-      .filter((p) => Math.abs(p.x - targetX) < 256);
+      .filter((p) => Math.abs(p.x - tryX) < 256);
 
     if (floorTiles.length > 0) {
       // Find the highest surface tile
@@ -336,23 +351,45 @@ export class MainGame extends Scene {
       const minX = Math.min(...sameLevelTiles.map((p) => p.x));
       const maxX = Math.max(...sameLevelTiles.map((p) => p.x)) + TILE_SIZE;
 
-      let finalX = targetX;
+      let finalX = tryX;
 
       // THE NUDGE: If the right edge hangs off the island, pull it back
       if (finalX + machineWidth > maxX) {
         finalX = maxX - machineWidth;
       }
 
-      // Only spawn if it actually fits on this island
-      if (finalX >= minX) {
+      // NEW: Verify the machine doesn't span a pit
+      // Check that there's continuous floor support under the entire machine
+      const machineBottomY = highestTile.y;
+      const floorBeneathMachine = this.platforms.getChildren().filter((p) => {
+        // Only check tiles at the same level as our support
+        if (p.y !== machineBottomY) return false;
+        // Check if tile is within the machine's footprint
+        const tileRightEdge = p.x + TILE_SIZE;
+        return p.x < finalX + machineWidth && tileRightEdge > finalX;
+      });
+
+      // Calculate how much floor we need
+      const requiredFloorWidth = machineWidth;
+      const actualFloorWidth = floorBeneathMachine.reduce((sum, tile) => {
+        // Calculate overlap between tile and machine footprint
+        const tileLeft = Math.max(tile.x, finalX);
+        const tileRight = Math.min(tile.x + TILE_SIZE, finalX + machineWidth);
+        return sum + Math.max(0, tileRight - tileLeft);
+      }, 0);
+
+      // Only spawn if the floor fully supports the machine
+      if (finalX >= minX && actualFloorWidth >= requiredFloorWidth * 0.9) {
         spawnMachine(
           this,
           finalX,
-          highestTile.y - layout.length * TILE_SIZE,
+          machineBottomY - machineHeight,
           layout,
           this.machineGroup,
         );
+        return true; // Spawn successful
       }
     }
+    return false; // No valid spawn position found
   }
 }
