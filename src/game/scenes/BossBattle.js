@@ -26,7 +26,12 @@ export class BossBattle extends Scene {
       for (let y = 0; y < height; y += TILE_SIZE) {
         const v = PhaserMath.Between(-30, 30);
         const g = 110 + v;
-        const bgTile = this.add.image(x + 32, y + 32, "factory", TILES.BG_TILE).setOrigin(0.5).setDepth(0).setAlpha(0.9).setTint(Display.Color.GetColor(g, g, g));
+        const bgTile = this.add
+          .image(x + 32, y + 32, "factory", TILES.BG_TILE)
+          .setOrigin(0.5)
+          .setDepth(0)
+          .setAlpha(0.9)
+          .setTint(Display.Color.GetColor(g, g, g));
         bgTile.setAngle(PhaserMath.Between(0, 3) * 90);
       }
     }
@@ -35,13 +40,24 @@ export class BossBattle extends Scene {
     this.platforms = this.physics.add.staticGroup();
     const floorTopY = height - TILE_SIZE;
     for (let x = 0; x < width; x += TILE_SIZE) {
-      this.platforms.create(x, floorTopY, "factory", TILES.BRICK).setOrigin(0).refreshBody();
+      this.platforms
+        .create(x, floorTopY, "factory", TILES.BRICK)
+        .setOrigin(0)
+        .refreshBody();
     }
 
     // High ground ledges
     const ledgeY = floorTopY - TILE_SIZE * 4;
-    this.platforms.create(0, ledgeY, "factory", TILES.BRICK_WORN).setOrigin(0).setScale(3, 1).refreshBody();
-    this.platforms.create(width - 3 * TILE_SIZE, ledgeY, "factory", TILES.BRICK_WORN).setOrigin(0).setScale(3, 1).refreshBody();
+    this.platforms
+      .create(0, ledgeY, "factory", TILES.BRICK_WORN)
+      .setOrigin(0)
+      .setScale(3, 1)
+      .refreshBody();
+    this.platforms
+      .create(width - 3 * TILE_SIZE, ledgeY, "factory", TILES.BRICK_WORN)
+      .setOrigin(0)
+      .setScale(3, 1)
+      .refreshBody();
 
     // 4. VISUAL EFFECTS
     this.particles = this.add.particles(0, 0, "factory", {
@@ -64,7 +80,9 @@ export class BossBattle extends Scene {
     // 6. BOSS INTRO
     this.showTerminalText(
       "YOU HAVE DESTROYED MY MACHINES!\nYOU CAN ONLY DELAY THE FUTURE!\n\nSO SORRY YOU'RE OUT OF WORK...\nNOW YOU'LL BE SORRY!",
-      () => { this.boss.isActive = true; }
+      () => {
+        this.boss.isActive = true;
+      },
     );
 
     // 7. PHYSICS & COLLISIONS
@@ -73,7 +91,11 @@ export class BossBattle extends Scene {
 
     // Standard contact damage (Non-smashing)
     this.physics.add.overlap(this.player, this.boss, () => {
-      if (!this.player.isSmashing && !this.isInvulnerable && this.boss.isActive) {
+      if (
+        !this.player.isSmashing &&
+        !this.isInvulnerable &&
+        this.boss.isActive
+      ) {
         this.handlePlayerHit(false);
       }
     });
@@ -96,19 +118,35 @@ export class BossBattle extends Scene {
   // --- TERMINAL TEXT EFFECT ---
   showTerminalText(content, onComplete) {
     const { width, height } = this.scale;
-    const label = this.add.text(width / 2, height / 2, "", {
-      fontFamily: "Departure Mono", fontSize: "22px", color: "#00ff00",
-      align: "center", stroke: "#000", strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(100);
+    const label = this.add
+      .text(width / 2, height / 2, "", {
+        fontFamily: "Departure Mono",
+        fontSize: "22px",
+        color: "#00ff00",
+        align: "center",
+        stroke: "#000",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(100);
 
     let i = 0;
     this.time.addEvent({
-      delay: 40, repeat: content.length - 1,
+      delay: 40,
+      repeat: content.length - 1,
       callback: () => {
         label.text += content[i++];
         if (i === content.length) {
           this.time.delayedCall(1500, () => {
-            this.tweens.add({ targets: label, alpha: 0, duration: 500, onComplete: () => { label.destroy(); if (onComplete) onComplete(); }});
+            this.tweens.add({
+              targets: label,
+              alpha: 0,
+              duration: 500,
+              onComplete: () => {
+                label.destroy();
+                if (onComplete) onComplete();
+              },
+            });
           });
         }
       },
@@ -118,14 +156,16 @@ export class BossBattle extends Scene {
   // --- DAMAGE HANDLING ---
   handlePlayerHit(isLaser = false) {
     if (this.isGameOver || this.isInvulnerable) return;
-    
-    playSFX("hurtPlayer")
+
+    playSFX("hurtPlayer");
 
     // Lasers deal double damage for "deadliness"
-    this.playerHP -= isLaser ? 2 : 1; 
-    
+    this.playerHP -= isLaser ? 2 : 1;
+
     // Visual feedback (Green for laser, Red for contact)
-    isLaser ? this.cameras.main.flash(200, 0, 255, 0) : this.cameras.main.flash(200, 255, 0, 0);
+    isLaser
+      ? this.cameras.main.flash(200, 0, 255, 0)
+      : this.cameras.main.flash(200, 255, 0, 0);
     this.cameras.main.shake(200, 0.02);
 
     if (this.playerHP <= 0) {
@@ -133,8 +173,15 @@ export class BossBattle extends Scene {
     } else {
       this.isInvulnerable = true;
       this.tweens.add({
-        targets: this.player, alpha: 0.5, yoyo: true, repeat: 5, duration: 100,
-        onComplete: () => { this.player.alpha = 1; this.isInvulnerable = false; }
+        targets: this.player,
+        alpha: 0.5,
+        yoyo: true,
+        repeat: 5,
+        duration: 100,
+        onComplete: () => {
+          this.player.alpha = 1;
+          this.isInvulnerable = false;
+        },
       });
     }
   }
@@ -144,13 +191,27 @@ export class BossBattle extends Scene {
     this.isGameOver = true;
     this.physics.pause();
     this.bossMusic.stop();
-    const goText = this.add.text(this.scale.width / 2, this.scale.height / 2, "GAME OVER", {
-      fontFamily: "Departure Mono", fontSize: "80px", color: "#ff0000", stroke: "#000", strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(200).setScale(0);
-    
-    this.tweens.add({ targets: goText, scale: 1, duration: 500, ease: "Back.easeOut", onComplete: () => {
-      this.time.delayedCall(3000, () => this.scene.start("Title"));
-    }});
+    const goText = this.add
+      .text(this.scale.width / 2, this.scale.height / 2, "GAME OVER", {
+        fontFamily: "Departure Mono",
+        fontSize: "80px",
+        color: "#ff0000",
+        stroke: "#000",
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(200)
+      .setScale(0);
+
+    this.tweens.add({
+      targets: goText,
+      scale: 1,
+      duration: 500,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        this.time.delayedCall(3000, () => this.scene.start("Title"));
+      },
+    });
   }
 
   handleWin() {
@@ -158,9 +219,20 @@ export class BossBattle extends Scene {
     this.boss.isActive = false;
     this.bossMusic.setRate(1.0);
     this.time.delayedCall(1000, () => {
-      this.showTerminalText("YOU ARE VICTORIOUS TODAY,\nBUT THE MACHINES ARE UNSTOPPABLE", () => {
-        this.time.delayedCall(2000, () => { this.bossMusic.stop(); this.scene.start("Title"); });
-      });
+      this.showTerminalText(
+        "YOU ARE VICTORIOUS TODAY,\nBUT THE MACHINES ARE UNSTOPPABLE\n\n\n\nGAME: NICK GOLEBIEWSKI 2026",
+        () => {
+          this.time.delayedCall(2000, () => {
+            this.tweens.add({
+              targets: this.bossMusic,
+              volume: 0,
+              duration: 500,
+              onComplete: () => this.bossMusic.stop(),
+            });
+            this.time.delayedCall(800, () => this.scene.start("Title"));
+          });
+        },
+      );
     });
   }
 
@@ -168,7 +240,7 @@ export class BossBattle extends Scene {
     if (!this.isGameOver) {
       this.player.update();
       this.boss.update(time);
-      
+
       // Continuous smash detection while animation is active
       if (this.player.isSmashing) {
         this.checkSmashHit(this.player.attackHitbox);
