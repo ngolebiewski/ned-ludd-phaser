@@ -1,56 +1,76 @@
 import { Physics, Input } from "phaser";
 import { playSFX } from "../SoundEffects";
+import { TouchControls } from "../input/TouchControls";
 
 export class Player extends Physics.Arcade.Sprite {
   constructor(scene, x, y) {
     super(scene, x, y, "player", "ned_smasher 0.aseprite");
+
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
     this.setGravityY(1000);
 
+    // =========================
+    // JUMP / COYOTE
+    // =========================
+
     this.lastJumpTime = 0;
     this.jumpCooldown = 400;
 
-    // ✅ COYOTE TIME
     this.coyoteTime = 120;
     this.lastGroundedTime = 0;
 
-    // ✅ TOUCH MOMENTUM WINDOW
-    this.touchMomentumUntil = 0;
+    // =========================
+    // BODY
+    // =========================
 
-    // Body
     this.setBodySize(64, 160);
     this.setOffset(32, 32);
 
-    // Attack hitbox
+    // =========================
+    // ATTACK HITBOX
+    // =========================
+
     this.attackHitbox = scene.add.rectangle(0, 0, 40, 120, 0xffffff, 0);
+
     scene.physics.add.existing(this.attackHitbox);
+
     this.attackHitbox.body.setAllowGravity(false);
     this.attackHitbox.body.enable = false;
 
-    // Keyboard
+    // =========================
+    // KEYBOARD
+    // =========================
+
     this.cursors = scene.input.keyboard.createCursorKeys();
+
     this.wasdKeys = scene.input.keyboard.addKeys({
       W: Input.Keyboard.KeyCodes.W,
       A: Input.Keyboard.KeyCodes.A,
       S: Input.Keyboard.KeyCodes.S,
       D: Input.Keyboard.KeyCodes.D,
     });
+
     this.spaceKey = scene.input.keyboard.addKey(Input.Keyboard.KeyCodes.SPACE);
 
-    // Touch
-    this.touchMovementDirection = 0;
-    this.touchPointerActive = false;
-    this.touchPointerId = null;
+    // =========================
+    // TOUCH CONTROLS
+    // =========================
+
+    this.touch = new TouchControls(scene, this);
+
+    // =========================
+    // STATE
+    // =========================
+
     this.isSmashing = false;
 
-    scene.input.on("pointerdown", (p) => this.onTouchStart(p));
-    scene.input.on("pointermove", (p) => this.onTouchMove(p));
-    scene.input.on("pointerup", (p) => this.onTouchEnd(p));
+    // =========================
+    // ANIMATION
+    // =========================
 
-    // Animation
     if (!scene.anims.exists("smash")) {
       scene.anims.create({
         key: "smash",
@@ -67,63 +87,7 @@ export class Player extends Physics.Arcade.Sprite {
   }
 
   // =========================
-  // TOUCH
-  // =========================
-
-  onTouchStart(pointer) {
-    if (!this.touchPointerActive) {
-      this.touchPointerActive = true;
-      this.touchPointerId = pointer.id;
-
-      this.swipeStartX = pointer.x;
-      this.swipeStartY = pointer.y;
-    }
-  }
-
-  onTouchMove(pointer) {
-    if (pointer.id !== this.touchPointerId) return;
-
-    const mid = this.scene.scale.width / 2;
-    this.touchMovementDirection = pointer.x < mid ? -1 : 1;
-  }
-
-  onTouchEnd(pointer) {
-    if (pointer.id !== this.touchPointerId) return;
-
-    this.touchPointerActive = false;
-    this.touchPointerId = null;
-
-    const deltaY = this.swipeStartY - pointer.y;
-    const deltaX = pointer.x - this.swipeStartX;
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    const now = this.scene.time.now;
-
-    // ✅ JUMP
-    if (deltaY > 80) {
-      if (Math.abs(deltaX) > 30) {
-        this.touchMovementDirection = deltaX > 0 ? 1 : -1;
-
-        // ✅ short momentum after swipe
-        this.touchMomentumUntil = now + 150;
-      }
-
-      this.attemptJump();
-    }
-
-    // ✅ TAP = SMASH
-    else if (distance < 40) {
-      this.touchMovementDirection = 0;
-      this.smash();
-    }
-
-    // ✅ OTHERWISE STOP
-    else {
-      this.touchMovementDirection = 0;
-    }
-  }
-
-  // =========================
-  // JUMP (WITH COYOTE TIME)
+  // JUMP
   // =========================
 
   attemptJump() {
@@ -134,15 +98,15 @@ export class Player extends Physics.Arcade.Sprite {
     if (canJump && now > this.lastJumpTime + this.jumpCooldown) {
       this.setVelocityY(-1150);
 
-      // ✅ ADD THIS: horizontal boost
-      if (this.touchMovementDirection !== 0) {
-        const boost = this.touchMovementDirection * 120;
+      // horizontal boost from swipe momentum
+      if (this.touch.touchMovementDirection !== 0) {
+        const boost = this.touch.touchMovementDirection * 120;
 
-        // add to current velocity instead of replacing it
         this.setVelocityX(this.body.velocity.x + boost);
       }
 
       playSFX("jump");
+
       this.lastJumpTime = now;
     }
   }
@@ -156,27 +120,29 @@ export class Player extends Physics.Arcade.Sprite {
 
     const now = this.scene.time.now;
 
-    // ✅ clear leftover momentum after short window
-    if (
-      !this.touchPointerActive &&
-      this.touchMomentumUntil &&
-      now > this.touchMomentumUntil
-    ) {
-      this.touchMovementDirection = 0;
-    }
+    this.touch.update();
 
-    // Track last grounded time (for coyote time)
+    // Track grounded time for coyote jump
     if (this.body.blocked.down) {
       this.lastGroundedTime = now;
     }
 
+    // =========================
+    // INPUT
+    // =========================
+
     const moveLeft = this.cursors.left.isDown || this.wasdKeys.A.isDown;
+
     const moveRight = this.cursors.right.isDown || this.wasdKeys.D.isDown;
 
-    const touchLeft = this.touchMovementDirection === -1;
-    const touchRight = this.touchMovementDirection === 1;
+    const touchLeft = this.touch.touchMovementDirection === -1;
 
-    // ✅ Continuous movement (THIS fixes mobile)
+    const touchRight = this.touch.touchMovementDirection === 1;
+
+    // =========================
+    // MOVEMENT
+    // =========================
+
     if (moveLeft || touchLeft) {
       this.setVelocityX(-240);
       this.setFlipX(false);
@@ -187,7 +153,10 @@ export class Player extends Physics.Arcade.Sprite {
       this.setVelocityX(0);
     }
 
-    // Keyboard jump
+    // =========================
+    // KEYBOARD JUMP
+    // =========================
+
     if (
       (this.cursors.up.isDown ||
         this.wasdKeys.W.isDown ||
@@ -196,9 +165,15 @@ export class Player extends Physics.Arcade.Sprite {
       now > this.lastJumpTime + this.jumpCooldown
     ) {
       this.setVelocityY(-1150);
+
       playSFX("jump");
+
       this.lastJumpTime = now;
     }
+
+    // =========================
+    // SMASH
+    // =========================
 
     if (Input.Keyboard.JustDown(this.spaceKey)) {
       this.smash();
@@ -211,15 +186,21 @@ export class Player extends Physics.Arcade.Sprite {
 
   smash() {
     this.isSmashing = true;
+
     playSFX("hit");
+
     this.setVelocityX(0);
+
     this.play("smash");
 
     const reach = 50;
+
     const hx = this.flipX ? this.x + reach : this.x - reach;
+
     const hy = this.y - 10;
 
     this.attackHitbox.setPosition(hx, hy);
+
     this.attackHitbox.body.enable = true;
 
     this.scene.time.delayedCall(150, () => {
@@ -230,7 +211,9 @@ export class Player extends Physics.Arcade.Sprite {
 
     this.once("animationcomplete", () => {
       this.isSmashing = false;
+
       this.attackHitbox.body.enable = false;
+
       this.setFrame("ned_smasher 0.aseprite");
     });
   }
