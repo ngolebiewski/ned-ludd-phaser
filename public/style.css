@@ -16,8 +16,8 @@ body {
 
 @font-face {
     font-family: 'DepartureMono';
-    src: url('/DepartureMono-1.500/DepartureMono-Regular.woff2') format('woff2'),
-         url('/DepartureMono-1.500/DepartureMono-Regular.woff') format('woff');
+    src: url('DepartureMono-1.500/DepartureMono-Regular.woff2') format('woff2'),
+         url('DepartureMono-1.500/DepartureMono-Regular.woff') format('woff');
     font-weight: normal;
     font-style: normal;
 }

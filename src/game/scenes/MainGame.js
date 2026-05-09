@@ -1,18 +1,13 @@
 import { Scene, Math as PhaserMath, Display } from "phaser";
 import { Player } from "../entities/Player";
 import { Soldier } from "../entities/Soldier";
-import {
-  TILES,
-  spawnWindow,
-  spawnMachine,
-  spawnGear,
-  spawnPyramid,
-} from "../../Constants";
+import { TILES, spawnWindow, spawnMachine, spawnGear } from "../../Constants";
+import { playSFX } from "../SoundEffects";
 
 export class MainGame extends Scene {
   constructor() {
     super("MainGame");
-    this.isInvulnerable = false; // Persistent state for the cheat
+    this.isInvulnerable = false;
   }
 
   create() {
@@ -20,39 +15,47 @@ export class MainGame extends Scene {
     const levelWidth = 8000;
     this.isRestarting = false;
 
-    // 0. INITIALIZE ASSETS
     Soldier.createAnimations(this);
-    if (!this.sound.get("factory_song")) {
-      this.sound.play("factory_song", { loop: true, volume: 0.3 });
+
+    if (this.factoryMusic && this.factoryMusic.isPlaying) {
+      this.factoryMusic.stop();
     }
 
-    // 1. CHEAT CODE LISTENERS
-    // Toggle Invulnerability with 'I'
+    this.factoryMusic = this.sound.add("factory_song", {
+      loop: true,
+      volume: 0.5,
+    });
+    this.factoryMusic.play();
+
+    // 1. CHEATS
     this.input.keyboard.on("keydown-I", () => {
       this.isInvulnerable = !this.isInvulnerable;
       this.player.setAlpha(this.isInvulnerable ? 0.5 : 1);
-      console.log("Invulnerability:", this.isInvulnerable);
     });
 
-    // Skip to Boss with '9'
     this.input.keyboard.on("keydown-NINE", () => {
       this.scene.start("BossBattle");
     });
 
-    // 2. BACKGROUND WALL TILES (Pixel Art Variance & 90deg rotation)
+    // this.input.keyboard.on("keydown-EIGHT", () => {
+    //   this.physics.world.drawDebug = !this.physics.world.drawDebug;
+    //   if (!this.physics.world.drawDebug && this.physics.world.debugGraphic) {
+    //     this.physics.world.debugGraphic.clear();
+    //   }
+    // });
+
+    // 2. BACKGROUND
     for (let x = 0; x < levelWidth; x += 64) {
       for (let y = 0; y < height; y += 64) {
         const v = PhaserMath.Between(-30, 30);
         const g = 110 + v;
         const variationTint = Display.Color.GetColor(g, g, g);
-
         const bgTile = this.add
           .image(x + 32, y + 32, "factory", TILES.BG_TILE)
           .setOrigin(0.5)
           .setDepth(0)
           .setAlpha(0.9)
           .setTint(variationTint);
-
         bgTile.setAngle(PhaserMath.Between(0, 3) * 90);
       }
     }
@@ -64,24 +67,27 @@ export class MainGame extends Scene {
 
     // 4. GROUPS
     this.platforms = this.physics.add.staticGroup();
-    this.machineGroup = this.physics.add.staticGroup();
+    this.machineGroup = this.physics.add.staticGroup(); // Now stores Containers
     this.enemyGroup = this.physics.add.group({ runChildUpdate: true });
 
-    // 5. TERRAIN & ENEMY GENERATION
+    // 5. TERRAIN
     this.generateTerrain(levelWidth, height);
 
     // 6. PLAYER & SYSTEMS
     this.setupPlayerAndSystems(levelWidth, height);
 
-    // 7. MACHINES
-    [1500, 3000, 4500, 6000, 7500].forEach((x) => {
-      this.spawnMachineSafely(
-        x,
-        Math.random() > 0.5 ? TILES.JENNY : TILES.STOCKING,
-      );
-    });
+    // 7. MACHINES (Increased density with 'Nudge' logic)
+    const spawn_dist = 600;
+    for (let x = spawn_dist; x < levelWidth - spawn_dist; x += spawn_dist) {
+      if (Math.random() > 0.3) {
+        this.spawnMachineSafely(
+          x,
+          Math.random() > 0.5 ? TILES.JENNY : TILES.STOCKING,
+        );
+      }
+    }
 
-    // 8. PHYSICS COLLIDERS
+    // 8. PHYSICS
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.enemyGroup, this.platforms);
 
@@ -102,8 +108,6 @@ export class MainGame extends Scene {
 
   generateTerrain(levelWidth, height) {
     let currentX = 0;
-
-    // STARTING FLOOR: Solid ground for 12 tiles to prevent air-spawn issues
     for (let i = 0; i < 12; i++) {
       this.platforms
         .create(i * 64, height - 64, "factory", TILES.BRICK)
@@ -116,7 +120,6 @@ export class MainGame extends Scene {
       const chunkWidth = PhaserMath.Between(6, 12);
       const isDoubleThick = Math.random() > 0.5;
 
-      // MAIN FLOOR
       for (let i = 0; i < chunkWidth; i++) {
         const xPos = currentX + i * 64;
         this.platforms
@@ -133,14 +136,12 @@ export class MainGame extends Scene {
         }
       }
 
-      // MORE SOLDIERS
       if (Math.random() > 0.4) {
         this.enemyGroup.add(
           new Soldier(this, currentX + 128, height - 130, "patrol"),
         );
       }
 
-      // CATWALKS
       if (Math.random() > 0.6) {
         const t2X = currentX + 128;
         const t2Y = height - 352;
@@ -182,9 +183,11 @@ export class MainGame extends Scene {
   setupPlayerAndSystems(levelWidth, height) {
     this.particles = this.add.particles(0, 0, "factory", {
       frame: TILES.SMOKE,
-      speed: 150,
+      speed: { min: 50, max: 200 }, // Variable speed for "burst" feel
+      angle: { min: 0, max: 360 }, // Burst in all directions
       scale: { start: 1, end: 0 },
-      lifespan: 400,
+      lifespan: { min: 300, max: 600 },
+      gravityY: -50, // Let smoke drift upward slightly
       emitting: false,
     });
 
@@ -203,22 +206,21 @@ export class MainGame extends Scene {
     if (this.player && this.player.active) {
       this.player.update();
       if (this.player.isSmashing) this.checkSmashHit();
-      
-      // TRANSITION TO BOSS
-      if (this.player.x > 7950) {
-        this.scene.start("BossBattle");
-      }
-
-      // PIT CHECK
-      if (this.player.y > this.scale.height + 100 && !this.isInvulnerable) {
+      if (this.player.x > 7950) this.scene.start("BossBattle");
+      if (this.player.y > this.scale.height + 100 && !this.isInvulnerable)
         this.handleDeath();
-      }
     }
   }
 
-  checkSmashHit() {
-    this.physics.overlap(this.player, this.machineGroup, (player, part) => {
-      if (!part.isBeingHit) this.handleMachineDamage(part);
+  checkSmashHit(hitSource) {
+    const source = hitSource || this.player;
+    this.physics.overlap(source, this.enemyGroup, (hitbox, enemy) =>
+      this.handleEnemySmash(enemy),
+    );
+
+    // Now overlapping with the Machine Container
+    this.physics.overlap(source, this.machineGroup, (hitbox, machine) => {
+      this.handleMachineDamage(machine);
     });
   }
 
@@ -226,6 +228,7 @@ export class MainGame extends Scene {
     if (!enemy.active) return;
     this.particles.emitParticleAt(enemy.x, enemy.y - 30, 15);
     this.cameras.main.shake(100, 0.01);
+    playSFX("hurt");
     enemy.setActive(false);
     enemy.body.setEnable(false);
     enemy.setTint(0xff0000);
@@ -240,31 +243,61 @@ export class MainGame extends Scene {
     });
   }
 
-  handleMachineDamage(part) {
-    part.isBeingHit = true;
-    part.health = (part.health || 3) - 1;
-    this.particles.emitParticleAt(part.x + 32, part.y + 32, 10);
+  handleMachineDamage(machine) {
+    if (!machine || !machine.list || machine.isBeingHit) return;
+
+    machine.isBeingHit = true;
+    machine.health -= 1;
+
+    // Get the dimensions from the physics body we set up in spawnMachine
+    const width = machine.body.width;
+    const height = machine.body.height;
+
+    // 1. TINT ALL PARTS
+    machine.list.forEach((child) => {
+      if (child.setTint) child.setTint(0xff0000);
+    });
+
+    // 2. EXPLODING PARTICLES FROM ENTIRE AREA
+    // We emit multiple times at random offsets within the machine's bounds
+    for (let i = 0; i < 15; i++) {
+      const randX = PhaserMath.Between(0, width);
+      const randY = PhaserMath.Between(0, height);
+      this.particles.emitParticleAt(machine.x + randX, machine.y + randY, 1);
+    }
+
     this.cameras.main.shake(100, 0.005);
-    part.setTint(0xff0000);
+
     this.time.delayedCall(200, () => {
-      if (part.active) {
-        part.clearTint();
-        part.isBeingHit = false;
+      if (machine.active && machine.list) {
+        machine.list.forEach((child) => {
+          if (child.clearTint) child.clearTint();
+        });
+        machine.isBeingHit = false;
       }
     });
-    if (part.health <= 0) part.destroy();
+
+    if (machine.health <= 0) {
+      playSFX("machine_break");
+      // Big final paricle burst when destroyed
+      for (let i = 0; i < 40; i++) {
+        const randX = PhaserMath.Between(0, width);
+        const randY = PhaserMath.Between(0, height);
+        this.particles.emitParticleAt(machine.x + randX, machine.y + randY, 1);
+      }
+      machine.destroy();
+    }
   }
 
   handleDeath() {
     if (this.isRestarting || this.isInvulnerable) return;
+    playSFX("death");
+    playSFX("hurtPlayer");
     this.isRestarting = true;
-
     this.cameras.main.shake(250, 0.02);
     this.cameras.main.flash(500, 150, 0, 0);
-
     this.player.setActive(false).setVisible(false);
     this.physics.pause();
-
     this.time.delayedCall(600, () => {
       this.isRestarting = false;
       this.scene.restart();
@@ -284,20 +317,79 @@ export class MainGame extends Scene {
   }
 
   spawnMachineSafely(targetX, layout) {
+    const TILE_SIZE = 64;
+    const machineWidth = layout[0].length * TILE_SIZE;
+    const machineHeight = layout.length * TILE_SIZE;
+
+    // Try multiple X positions: back a few tiles, then forward a few
+    const offsets = [0, -TILE_SIZE, -TILE_SIZE * 2, TILE_SIZE, TILE_SIZE * 2];
+
+    for (const offset of offsets) {
+      const tryX = targetX + offset;
+      if (this.trySpawnMachineAt(tryX, layout, machineWidth, machineHeight)) {
+        return; // Success, spawn and exit
+      }
+    }
+  }
+
+  trySpawnMachineAt(tryX, layout, machineWidth, machineHeight) {
+    const TILE_SIZE = 64;
+
+    // Find tiles in the immediate vicinity
     const floorTiles = this.platforms
       .getChildren()
-      .filter((p) => Math.abs(p.x - targetX) < 128);
+      .filter((p) => Math.abs(p.x - tryX) < 256);
+
     if (floorTiles.length > 0) {
+      // Find the highest surface tile
       const highestTile = floorTiles.reduce((prev, curr) =>
         prev.y < curr.y ? prev : curr,
       );
-      spawnMachine(
-        this,
-        highestTile.x,
-        highestTile.y - layout.length * 64,
-        layout,
-        this.machineGroup,
-      );
+
+      // Identify the "island" boundaries at this floor height
+      const sameLevelTiles = floorTiles.filter((p) => p.y === highestTile.y);
+      const minX = Math.min(...sameLevelTiles.map((p) => p.x));
+      const maxX = Math.max(...sameLevelTiles.map((p) => p.x)) + TILE_SIZE;
+
+      let finalX = tryX;
+
+      // THE NUDGE: If the right edge hangs off the island, pull it back
+      if (finalX + machineWidth > maxX) {
+        finalX = maxX - machineWidth;
+      }
+
+      // NEW: Verify the machine doesn't span a pit
+      // Check that there's continuous floor support under the entire machine
+      const machineBottomY = highestTile.y;
+      const floorBeneathMachine = this.platforms.getChildren().filter((p) => {
+        // Only check tiles at the same level as our support
+        if (p.y !== machineBottomY) return false;
+        // Check if tile is within the machine's footprint
+        const tileRightEdge = p.x + TILE_SIZE;
+        return p.x < finalX + machineWidth && tileRightEdge > finalX;
+      });
+
+      // Calculate how much floor we need
+      const requiredFloorWidth = machineWidth;
+      const actualFloorWidth = floorBeneathMachine.reduce((sum, tile) => {
+        // Calculate overlap between tile and machine footprint
+        const tileLeft = Math.max(tile.x, finalX);
+        const tileRight = Math.min(tile.x + TILE_SIZE, finalX + machineWidth);
+        return sum + Math.max(0, tileRight - tileLeft);
+      }, 0);
+
+      // Only spawn if the floor fully supports the machine
+      if (finalX >= minX && actualFloorWidth >= requiredFloorWidth * 0.9) {
+        spawnMachine(
+          this,
+          finalX,
+          machineBottomY - machineHeight,
+          layout,
+          this.machineGroup,
+        );
+        return true; // Spawn successful
+      }
     }
+    return false; // No valid spawn position found
   }
 }

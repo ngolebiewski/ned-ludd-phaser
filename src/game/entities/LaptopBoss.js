@@ -1,4 +1,5 @@
 import { Physics, Math as PhaserMath, Geom } from "phaser";
+import { playSFX } from "../SoundEffects";
 
 export class LaptopBoss extends Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -56,6 +57,7 @@ export class LaptopBoss extends Physics.Arcade.Sprite {
   fireLasers() {
     this.play("laptop-eyes");
     this.setVelocityX(0);
+    playSFX("laser");
 
     this.scene.time.delayedCall(600, () => {
       if (!this.active || this.hp <= 0) return;
@@ -99,6 +101,7 @@ export class LaptopBoss extends Physics.Arcade.Sprite {
     this.isBeingHit = true;
     this.hp--;
     this.setTint(0xff0000);
+    playSFX("hurtComputer")
     
     if (this.scene.particles) {
       this.scene.particles.emitParticleAt(this.x, this.y, 10);
@@ -113,6 +116,7 @@ export class LaptopBoss extends Physics.Arcade.Sprite {
 
     // PHASE 2 TRANSITION (Big Laptop)
     if (this.hp === 5) {
+      playSFX("computer_mumble")
       this.scene.cameras.main.shake(500, 0.02);
       
       // Stop physics briefly to prevent "pop-out" glitches

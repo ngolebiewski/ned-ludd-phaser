@@ -36,14 +36,31 @@ export const spawnWindow = (scene, x, y) => {
  * Spawns a machine into a physics group
  */
 export const spawnMachine = (scene, x, y, layout, group) => {
-    layout.forEach((row, rowIndex) => {
-        row.forEach((frame, colIndex) => {
-            if (frame === 0) return; 
-            const part = group.create(x + (colIndex * 64), y + (rowIndex * 64), 'factory', frame).setOrigin(0);
-            part.health = 3; 
-            part.isMachine = true; 
-        });
+  const TILE_SIZE = 64;
+  const machine = scene.add.container(x, y);
+  
+  layout.forEach((row, rowIndex) => {
+    row.forEach((frame, colIndex) => {
+      const tile = scene.add.image(colIndex * TILE_SIZE, rowIndex * TILE_SIZE, "factory", frame)
+        .setOrigin(0);
+      machine.add(tile);
     });
+  });
+
+  // Add physics to the container
+  scene.physics.add.existing(machine, true); 
+  
+  const width = layout[0].length * TILE_SIZE;
+  const height = layout.length * TILE_SIZE;
+  machine.body.setSize(width, height);
+  machine.body.setOffset(0, 0);
+
+  machine.health = 5;
+  
+  // CRITICAL: Add to the group so overlap works
+  group.add(machine); 
+  
+  return machine;
 };
 
 /**

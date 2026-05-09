@@ -1,5 +1,6 @@
 import { Physics, Input } from "phaser";
 import { playSFX } from "../SoundEffects";
+import { TouchControls } from "../input/TouchControls";
 
 export class Player extends Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -10,21 +11,66 @@ export class Player extends Physics.Arcade.Sprite {
 
     this.setCollideWorldBounds(true);
     this.setGravityY(1000);
-    this.lastJumpTime = 0;
-    this.jumpCooldown = 400; // 400ms delay between jumps
 
-    // Match the 128x192 sprite size better
+    // =========================
+    // JUMP / COYOTE
+    // =========================
+
+    this.lastJumpTime = 0;
+    this.jumpCooldown = 400;
+
+    this.coyoteTime = 120;
+    this.lastGroundedTime = 0;
+
+    // =========================
+    // BODY
+    // =========================
+
     this.setBodySize(64, 160);
     this.setOffset(32, 32);
 
+    // =========================
+    // ATTACK HITBOX
+    // =========================
+
+    this.attackHitbox = scene.add.rectangle(0, 0, 40, 120, 0xffffff, 0);
+
+    scene.physics.add.existing(this.attackHitbox);
+
+    this.attackHitbox.body.setAllowGravity(false);
+    this.attackHitbox.body.enable = false;
+
+    // =========================
+    // KEYBOARD
+    // =========================
+
     this.cursors = scene.input.keyboard.createCursorKeys();
 
-    // Define the "Space" key specifically to avoid the "Phaser.Input" global error
+    this.wasdKeys = scene.input.keyboard.addKeys({
+      W: Input.Keyboard.KeyCodes.W,
+      A: Input.Keyboard.KeyCodes.A,
+      S: Input.Keyboard.KeyCodes.S,
+      D: Input.Keyboard.KeyCodes.D,
+    });
+
     this.spaceKey = scene.input.keyboard.addKey(Input.Keyboard.KeyCodes.SPACE);
+
+    // =========================
+    // TOUCH CONTROLS
+    // =========================
+
+    this.touch = new TouchControls(scene, this);
+
+    // =========================
+    // STATE
+    // =========================
 
     this.isSmashing = false;
 
-    // Ensure animations exist (Safe check if Boot didn't do it)
+    // =========================
+    // ANIMATION
+    // =========================
+
     if (!scene.anims.exists("smash")) {
       scene.anims.create({
         key: "smash",
@@ -40,58 +86,134 @@ export class Player extends Physics.Arcade.Sprite {
     }
   }
 
+  // =========================
+  // JUMP
+  // =========================
+
+  attemptJump() {
+    const now = this.scene.time.now;
+
+    const canJump = now < this.lastGroundedTime + this.coyoteTime;
+
+    if (canJump && now > this.lastJumpTime + this.jumpCooldown) {
+      this.setVelocityY(-1150);
+
+      // horizontal boost from swipe momentum
+      if (this.touch.touchMovementDirection !== 0) {
+        const boost = this.touch.touchMovementDirection * 120;
+
+        this.setVelocityX(this.body.velocity.x + boost);
+      }
+
+      playSFX("jump");
+
+      this.lastJumpTime = now;
+    }
+  }
+
+  // =========================
+  // UPDATE
+  // =========================
+
   update() {
     if (this.isSmashing) return;
 
-    // LEFT (Native)
-    if (this.cursors.left.isDown) {
+    const now = this.scene.time.now;
+
+    this.touch.update();
+
+    // Track grounded time for coyote jump
+    if (this.body.blocked.down) {
+      this.lastGroundedTime = now;
+    }
+
+    // =========================
+    // INPUT
+    // =========================
+
+    const moveLeft = this.cursors.left.isDown || this.wasdKeys.A.isDown;
+
+    const moveRight = this.cursors.right.isDown || this.wasdKeys.D.isDown;
+
+    const touchLeft = this.touch.touchMovementDirection === -1;
+
+    const touchRight = this.touch.touchMovementDirection === 1;
+
+    // =========================
+    // MOVEMENT
+    // =========================
+
+    if (moveLeft || touchLeft) {
       this.setVelocityX(-240);
       this.setFlipX(false);
-    }
-    // RIGHT (Flipped)
-    else if (this.cursors.right.isDown) {
+    } else if (moveRight || touchRight) {
       this.setVelocityX(240);
       this.setFlipX(true);
     } else {
       this.setVelocityX(0);
     }
 
-    const currentTime = this.scene.time.now;
+    // =========================
+    // KEYBOARD JUMP
+    // =========================
 
-    // Jump (Up or Shift)
     if (
-      (this.cursors.up.isDown || this.cursors.shift.isDown) &&
-      this.body.blocked.down &&
-      currentTime > this.lastJumpTime + this.jumpCooldown
+      (this.cursors.up.isDown ||
+        this.wasdKeys.W.isDown ||
+        this.wasdKeys.S.isDown) &&
+      now < this.lastGroundedTime + this.coyoteTime &&
+      now > this.lastJumpTime + this.jumpCooldown
     ) {
       this.setVelocityY(-1150);
+
       playSFX("jump");
-      this.lastJumpTime = currentTime; // Reset the cooldown timer
+
+      this.lastJumpTime = now;
     }
 
-    // Smash (Using the spaceKey instance instead of the global Phaser call)
+    // =========================
+    // SMASH
+    // =========================
+
     if (Input.Keyboard.JustDown(this.spaceKey)) {
       this.smash();
     }
   }
 
+  // =========================
+  // SMASH
+  // =========================
+
   smash() {
     this.isSmashing = true;
+
     playSFX("hit");
+
     this.setVelocityX(0);
+
     this.play("smash");
 
-    // Trigger the hit detection in MainGame
+    const reach = 50;
+
+    const hx = this.flipX ? this.x + reach : this.x - reach;
+
+    const hy = this.y - 10;
+
+    this.attackHitbox.setPosition(hx, hy);
+
+    this.attackHitbox.body.enable = true;
+
     this.scene.time.delayedCall(150, () => {
       if (this.scene.checkSmashHit) {
-        this.scene.checkSmashHit();
+        this.scene.checkSmashHit(this.attackHitbox);
       }
     });
 
     this.once("animationcomplete", () => {
       this.isSmashing = false;
-      // No walk animation defined in your JSON tags yet (just a static frame),
-      // so we stop the animation or go back to frame 0.
+
+      this.attackHitbox.body.enable = false;
+
       this.setFrame("ned_smasher 0.aseprite");
     });
   }

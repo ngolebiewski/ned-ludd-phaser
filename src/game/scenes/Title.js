@@ -20,6 +20,8 @@ export class Title extends Scene {
 
   create() {
     const { width, height } = this.scale;
+
+    // Desktop debug key
     this.input.keyboard.on("keydown-NINE", () => {
       this.scene.start("BossBattle");
     });
@@ -31,7 +33,7 @@ export class Title extends Scene {
       width,
       height,
       "factory",
-      this.TILES.BG_GRID,
+      this.TILES.BG_GRID
     );
     this.bg.setOrigin(0).setAlpha(0.9).setTint(0x666666);
 
@@ -47,7 +49,7 @@ export class Title extends Scene {
       this.englandGroup,
       this.TILES.ENGLAND_ART,
       width / 2,
-      height / 2,
+      height / 2
     );
 
     // 5. Text
@@ -55,23 +57,28 @@ export class Title extends Scene {
       .text(
         width / 2,
         height - 100,
-        "Nottingham, England, 1812... Space to START",
+        "Nottingham, England, 1812... SPACE to START",
         {
           fontFamily: '"DepartureMono"',
           fontSize: "32px",
           fill: "#ffffff",
           stroke: "#000000",
           strokeThickness: 4,
-        },
+        }
       )
       .setOrigin(0.5)
       .setDepth(100);
 
-    // 6. Transition Logic
+    // 6. Input handlers - keyboard AND touch
     this.input.keyboard.once("keydown-SPACE", () => this.startTransition());
+    this.input.on("pointerdown", () => this.startTransition());
   }
 
   startTransition() {
+    // Prevent multiple triggers
+    this.input.keyboard.off("keydown-SPACE");
+    this.input.off("pointerdown");
+
     // Phase 1: Hide Title Art and Text
     this.tweens.add({
       targets: [this.titleGroup, this.infoText],
@@ -112,7 +119,7 @@ export class Title extends Scene {
             startX + colIndex * tileSize,
             startY + rowIndex * tileSize,
             "factory",
-            frame,
+            frame
           )
           .setOrigin(0)
           .setScale(scale);
