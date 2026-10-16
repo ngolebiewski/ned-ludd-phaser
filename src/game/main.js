@@ -13,6 +13,7 @@ const config = {
     backgroundColor: "#222",
 
     pixelArt: true, 
+    input: { gamepad: true },
     physics: {
         default: 'arcade',
         arcade: {

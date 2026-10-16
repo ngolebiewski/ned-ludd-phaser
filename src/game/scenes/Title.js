@@ -1,4 +1,5 @@
-import { Scene } from "phaser";
+import { Scene, Input } from "phaser";
+import { TouchControls } from "../input/TouchControls";
 
 export class Title extends Scene {
   constructor() {
@@ -69,9 +70,17 @@ export class Title extends Scene {
       .setOrigin(0.5)
       .setDepth(100);
 
-    // 6. Input handlers - keyboard AND touch
+    // 6. Input handlers - keyboard AND touch - (NEW) and gamepad
     this.input.keyboard.once("keydown-SPACE", () => this.startTransition());
     this.input.on("pointerdown", () => this.startTransition());
+    // Trigger on ANY button press from ANY connected gamepad
+    if (this.input.gamepad) {
+        this.input.gamepad.once('down', (pad, button, index) => {
+            this.startTransition();
+        });
+}
+
+
   }
 
   startTransition() {
